@@ -228,80 +228,88 @@ if 'run_button' in locals() and run_button:
             st.success("Data split successfully!")
 
 # --- Display Logic ---
+
+# This section defines the content for the initial data preview.
+def render_initial_preview(container):
+    with container:
+        st.subheader("Input Data Preview")
+        st.dataframe(st.session_state.source_df.head(), use_container_width=True)
+
+        st.divider()
+        st.subheader("On-Demand Analysis")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📊 Show Data Statistics", use_container_width=True, key="stats_button"):
+                st.session_state.show_stats = not st.session_state.get("show_stats", False)
+        with col2:
+            if st.button("📈 Show Time Coverage Plot", use_container_width=True, key="plot_button"):
+                st.session_state.show_plot = not st.session_state.get("show_plot", False)
+
+        if st.session_state.get("show_stats", False):
+            st.subheader("Descriptive Statistics & Null Values")
+            with st.spinner("Calculating statistics..."):
+                stats_df = get_descriptive_stats(st.session_state.source_df)
+                st.dataframe(stats_df)
+        
+        if st.session_state.get("show_plot", False):
+            st.subheader("Initial Time Coverage")
+            with st.spinner("Generating plot..."):
+                preview_stats = {"cleaned": get_df_stats(st.session_state.source_df)}
+                fig = plot_time_coverage(preview_stats)
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Could not generate time coverage plot.")
+
+# If data is loaded but not yet split, show the initial preview directly.
 if 'source_df' in st.session_state and 'split_stats' not in st.session_state:
-    st.divider()
-    st.subheader("Input Data Preview")
-    st.dataframe(st.session_state.source_df.head(), use_container_width=True)
+    render_initial_preview(st.container())
 
-    st.divider()
-    st.subheader("On-Demand Analysis")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📊 Show Data Statistics", use_container_width=True):
-            # Toggle the state
-            st.session_state.show_stats = not st.session_state.get("show_stats", False)
-    with col2:
-        if st.button("📈 Show Time Coverage Plot", use_container_width=True):
-            # Toggle the state
-            st.session_state.show_plot = not st.session_state.get("show_plot", False)
-
-    # Conditionally display the stats table
-    if st.session_state.get("show_stats", False):
-        st.subheader("Descriptive Statistics & Null Values")
-        with st.spinner("Calculating statistics..."):
-            stats_df = get_descriptive_stats(st.session_state.source_df)
-            st.dataframe(stats_df)
-    
-    # Conditionally display the time coverage plot
-    if st.session_state.get("show_plot", False):
-        st.subheader("Initial Time Coverage")
-        with st.spinner("Generating plot..."):
-            preview_stats = {"cleaned": get_df_stats(st.session_state.source_df)}
-            fig = plot_time_coverage(preview_stats)
-            if fig:
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.warning("Could not generate time coverage plot.")
-
-
+# If data has been split, use tabs to organize the display.
 if 'split_stats' in st.session_state:
-    st.divider()
-    st.subheader("Split Summary & Visualization")
-    fig = plot_time_coverage(st.session_state.split_stats)
-    if fig: st.plotly_chart(fig, use_container_width=True)
+    tab1, tab2 = st.tabs(["Split Summary & Visualization", "Initial Data Preview"])
+
+    with tab1:
+        st.subheader("Split Summary & Visualization")
+        fig = plot_time_coverage(st.session_state.split_stats)
+        if fig: st.plotly_chart(fig, use_container_width=True)
+        
+        st.divider()
+        st.subheader("💾 Save Results to Disk")
+        model_name = st.session_state.model_name
+        inclusive_dates = st.session_state.get("inclusive_dates", "NODATES")
+        train_val_out_fname = f"CLEANED-{model_name}-{inclusive_dates}-WITH-OUTLIER.csv"
+        holdout_out_fname = f"{model_name}-{inclusive_dates}-HOLDOUT.csv"
+        
+        st.info(f"Clicking 'Save' will write files to `{st.session_state.dataset_path}`:")
+        st.code(f"• {train_val_out_fname}\n• {holdout_out_fname}", language='bash')
+        
+        if st.button("💾 Save Split Files"):
+            with st.spinner("Saving files..."):
+                dataset_path = st.session_state.dataset_path
+                dataset_path.mkdir(parents=True, exist_ok=True)
+                train_val_out_path = dataset_path / train_val_out_fname
+                holdout_out_path = dataset_path / holdout_out_fname
+                df_train_to_save = pd.concat([st.session_state.df_header, st.session_state.train_df], ignore_index=True)
+                df_holdout_to_save = pd.concat([st.session_state.df_header, st.session_state.holdout_df], ignore_index=True)
+                df_train_to_save.to_csv(train_val_out_path, index=False)
+                df_holdout_to_save.to_csv(holdout_out_path, index=False)
+                st.success(f"Files saved successfully!")
+                st.balloons()
+                
+        st.divider()
+        st.subheader("Data Previews & Browser Download")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("Train / Validation Set Preview")
+            st.dataframe(st.session_state.train_df.head(), use_container_width=True)
+            st.download_button("Download Train CSV", convert_df_to_csv(st.session_state.train_df), train_val_out_fname, use_container_width=True)
+        with col2:
+            st.write("Holdout Set Preview")
+            st.dataframe(st.session_state.holdout_df.head(), use_container_width=True)
+            st.download_button("Download Holdout CSV", convert_df_to_csv(st.session_state.holdout_df), holdout_out_fname, use_container_width=True)
     
-    st.divider()
-    st.subheader("💾 Save Results to Disk")
-    model_name = st.session_state.model_name
-    inclusive_dates = st.session_state.get("inclusive_dates", "NODATES")
-    train_val_out_fname = f"CLEANED-{model_name}-{inclusive_dates}-WITH-OUTLIER.csv"
-    holdout_out_fname = f"{model_name}-{inclusive_dates}-HOLDOUT.csv"
-    
-    st.info(f"Clicking 'Save' will write files to `{st.session_state.dataset_path}`:")
-    st.code(f"• {train_val_out_fname}\n• {holdout_out_fname}", language='bash')
-    
-    if st.button("💾 Save Split Files"):
-        with st.spinner("Saving files..."):
-            dataset_path = st.session_state.dataset_path
-            dataset_path.mkdir(parents=True, exist_ok=True)
-            train_val_out_path = dataset_path / train_val_out_fname
-            holdout_out_path = dataset_path / holdout_out_fname
-            df_train_to_save = pd.concat([st.session_state.df_header, st.session_state.train_df], ignore_index=True)
-            df_holdout_to_save = pd.concat([st.session_state.df_header, st.session_state.holdout_df], ignore_index=True)
-            df_train_to_save.to_csv(train_val_out_path, index=False)
-            df_holdout_to_save.to_csv(holdout_out_path, index=False)
-            st.success(f"Files saved successfully!")
-            st.balloons()
-            
-    st.divider()
-    st.subheader("Data Previews & Browser Download")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.write("Train / Validation Set Preview")
-        st.dataframe(st.session_state.train_df.head(), use_container_width=True)
-        st.download_button("Download Train CSV", convert_df_to_csv(st.session_state.train_df), train_val_out_fname, use_container_width=True)
-    with col2:
-        st.write("Holdout Set Preview")
-        st.dataframe(st.session_state.holdout_df.head(), use_container_width=True)
-        st.download_button("Download Holdout CSV", convert_df_to_csv(st.session_state.holdout_df), holdout_out_fname, use_container_width=True)
+    with tab2:
+        # Render the same initial preview content within the second tab.
+        render_initial_preview(st.container())
 
