@@ -98,12 +98,21 @@ def plot_time_coverage(stats: dict):
     return fig
 
 def get_df_stats(df, date_col="Point Name"):
-    """Generates a stats dictionary for a single dataframe."""
+    """Generates a stats dictionary needed for the time coverage plot."""
     if len(df) > 0:
         start = pd.to_datetime(df[date_col]).iloc[0]
         end = pd.to_datetime(df[date_col]).iloc[-1]
         return {"start": start, "end": end, "size": len(df)}
     return {"start": None, "end": None, "size": 0}
+
+@st.cache_data
+def get_descriptive_stats(df: pd.DataFrame) -> pd.DataFrame:
+    """Calculates descriptive statistics and null percentages for a DataFrame."""
+    stats = df.describe(include='all').T
+    null_counts = df.isnull().sum()
+    null_percentages = (null_counts / len(df)) * 100
+    stats['null_%'] = null_percentages.round(2)
+    return stats
 
 # --- Sidebar Controls ---
 
@@ -115,7 +124,7 @@ with st.sidebar:
         if folder_path:
             st.session_state.data_root_path = folder_path
             # Clear old selections when a new root folder is chosen
-            for key in ['site_name', 'utility_name', 'sprint_name', 'model_name', 'selected_file', 'source_df', 'split_stats']:
+            for key in ['site_name', 'utility_name', 'sprint_name', 'model_name', 'selected_file', 'source_df', 'split_stats', 'show_stats', 'show_plot']:
                 if key in st.session_state:
                     del st.session_state[key]
     
@@ -169,7 +178,7 @@ with st.sidebar:
                 st.warning(f"A 'dataset' subfolder is missing in `{model_path}`.")
         
         preview_button_disabled = "selected_file" not in st.session_state or not st.session_state.selected_file
-        preview_button = st.button("🔍 Load & Preview Data", use_container_width=True, disabled=preview_button_disabled)
+        preview_button = st.button("🔍 Load Data", use_container_width=True, disabled=preview_button_disabled)
 
     # Split configuration appears after data is loaded
     if 'source_df' in st.session_state:
@@ -223,10 +232,37 @@ if 'source_df' in st.session_state and 'split_stats' not in st.session_state:
     st.divider()
     st.subheader("Input Data Preview")
     st.dataframe(st.session_state.source_df.head(), use_container_width=True)
-    st.subheader("Initial Time Coverage")
-    preview_stats = {"cleaned": get_df_stats(st.session_state.source_df)}
-    fig = plot_time_coverage(preview_stats)
-    if fig: st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+    st.subheader("On-Demand Analysis")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📊 Show Data Statistics", use_container_width=True):
+            # Toggle the state
+            st.session_state.show_stats = not st.session_state.get("show_stats", False)
+    with col2:
+        if st.button("📈 Show Time Coverage Plot", use_container_width=True):
+            # Toggle the state
+            st.session_state.show_plot = not st.session_state.get("show_plot", False)
+
+    # Conditionally display the stats table
+    if st.session_state.get("show_stats", False):
+        st.subheader("Descriptive Statistics & Null Values")
+        with st.spinner("Calculating statistics..."):
+            stats_df = get_descriptive_stats(st.session_state.source_df)
+            st.dataframe(stats_df)
+    
+    # Conditionally display the time coverage plot
+    if st.session_state.get("show_plot", False):
+        st.subheader("Initial Time Coverage")
+        with st.spinner("Generating plot..."):
+            preview_stats = {"cleaned": get_df_stats(st.session_state.source_df)}
+            fig = plot_time_coverage(preview_stats)
+            if fig:
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("Could not generate time coverage plot.")
+
 
 if 'split_stats' in st.session_state:
     st.divider()
@@ -268,3 +304,4 @@ if 'split_stats' in st.session_state:
         st.write("Holdout Set Preview")
         st.dataframe(st.session_state.holdout_df.head(), use_container_width=True)
         st.download_button("Download Holdout CSV", convert_df_to_csv(st.session_state.holdout_df), holdout_out_fname, use_container_width=True)
+
