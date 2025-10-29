@@ -9,7 +9,7 @@ st.set_page_config(
 st.title("🛠️ Model Development Toolkit")
 
 st.markdown("""
-Welcome to the interactive Model Development Toolkit! This application is a multi-page utility designed to guide you through a comprehensive data processing and analysis workflow, from initial data splitting to final accuracy calculation.
+Welcome to the interactive Model Development Toolkit! This application is a multi-page utility designed to guide you through a comprehensive data processing and analysis workflow, from initial data splitting to final accuracy calculation and model QA.
 
 Each page in the sidebar represents a distinct step in the model development lifecycle. Please proceed through them in order.
 """)
@@ -20,20 +20,24 @@ st.header("Workflow Guide")
 
 st.markdown("""
 **1. `Data Splitting`**
--   **Purpose:** To perform the initial split of your raw dataset into a **training/validation set** and a **holdout set**.
--   **Action:** Select your project folder and the raw `CLEANED...-RAW.csv` file. The app will partition the data based on your chosen date or percentage, preparing it for the cleaning process.
+-   **Purpose:** Perform the initial split of your raw dataset into a **training/validation set** and a **holdout set**.
+-   **Action:** Select project folder and raw `CLEANED...-RAW.csv`. Partitions data by date/percentage. Outputs: `...-WITH-OUTLIER.csv` and `...-HOLDOUT.csv`.
 
 **2. `Outlier Detection`**
--   **Purpose:** To interactively identify and remove outliers from the training/validation set created in the previous step.
--   **Action:** Load the `CLEANED...-WITH-OUTLIER.csv` file. Analyze each feature against the operational state, visualize potential outliers, and remove them iteratively. Save the final cleaned dataset.
+-   **Purpose:** Interactively identify and remove outliers from the training/validation set.
+-   **Action:** Load `...-WITH-OUTLIER.csv`. Analyze features, visualize outliers, confirm removal. Output: `...-WITHOUT-OUTLIER.csv`.
 
 **3. `Split Training & Validation`**
--   **Purpose:** To perform a stratified split on the cleaned dataset, separating it into final **training** and **validation** sets.
--   **Action:** The app requires both the `WITH-OUTLIER` and `WITHOUT-OUTLIER` datasets, along with configuration files. It uses a continuous stratification method to ensure both sets have similar distributions.
+-   **Purpose:** Perform a stratified split on the cleaned dataset into final **training** and **validation** sets.
+-   **Action:** Requires `WITH-OUTLIER`, `WITHOUT-OUTLIER`, and config files. Uses stratification. Outputs: `TRAINING...csv`, `VALIDATION...WITH-OUTLIER.csv`, `VALIDATION...WITHOUT-OUTLIER.csv`.
 
 **4. `Calculate Accuracy`**
--   **Purpose:** To process the model's output (`.dat` file) and calculate the final accuracy and relative deviation for each metric.
--   **Action:** Select the project folder to locate the model's `.dat` file and the `fault_detection.csv` config. The app will parse the data and generate a final accuracy report.
+-   **Purpose:** Process model output (`.dat` file) and calculate accuracy/relative deviation.
+-   **Action:** Select project, finds `.dat` and `fault_detection.csv`. Parses data, generates accuracy report. Output: `..._Accuracy.csv`.
+
+**5. `Model QA`** (New)
+-   **Purpose:** Perform Quality Assurance by comparing model predictions against actual values from the validation set.
+-   **Action:** Select project, finds validation set and prediction files. Calculates metrics (MAE, MSE, R², etc.) and generates comparison plots. Output: QA Report/Plots.
 """)
 
 st.sidebar.success("Select a page above to begin.")
